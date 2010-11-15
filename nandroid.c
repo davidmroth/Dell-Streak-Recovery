@@ -315,7 +315,6 @@ int nandroid_restore(const char* backup_path, int restore_boot, int restore_syst
         return print_and_error("MD5 mismatch!\n");
     
     int ret;
-#ifndef BOARD_RECOVERY_IGNORE_BOOTABLES
     if (restore_boot)
     {
         ui_print("Erasing boot before restore...\n");
@@ -328,7 +327,6 @@ int nandroid_restore(const char* backup_path, int restore_boot, int restore_syst
             return ret;
         }
     }
-#endif
     
     if (restore_system && 0 != (ret = nandroid_restore_partition(backup_path, "SYSTEM:")))
         return ret;

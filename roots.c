@@ -38,13 +38,15 @@ static const char g_package_file[] = "@\0g_package_file";
 
 static RootInfo g_roots[] = {
     { "BOOT:", g_mtd_device, NULL, "boot", NULL, g_raw },
-    { "OEM_LOG:", g_mtd_device, NULL, "boot", NULL, g_raw },
+    { "RECOVERY:", g_mtd_device, NULL, "recovery", "/", g_raw },
+    { "SYSTEM:", g_mtd_device, NULL, "system", "/system", "yaffs2" },
+    { "USERDATA:", g_mtd_device, NULL, "userdata", "/firstboot", "yaffs2" },
+    { "OEM_LOG:", g_mtd_device, NULL, "oem_log", NULL, g_raw },
+    { "LOGFILTER:", g_mtd_device, NULL, "LogFilter", NULL, g_raw },
     { "CACHE:", "/dev/block/innersd0p5", NULL, NULL, "/cache", "ext3" },
     { "DATA:", "/dev/block/innersd0p6", NULL, NULL, "/data", "ext3" },
-    { "PACKAGE:", NULL, NULL, NULL, NULL, g_package_file },
-    { "RECOVERY:", g_mtd_device, NULL, "recovery", "/", g_raw },
     { "SDCARD:", "/dev/block/mmcblk1p1", NULL, NULL, "/sdcard", "vfat" },
-    { "SYSTEM:", g_mtd_device, NULL, "system", "/system", "yaffs2" },
+    { "PACKAGE:", NULL, NULL, NULL, NULL, g_package_file },
     { "MBM:", g_mtd_device, NULL, "mbm", NULL, g_raw },
     { "TMP:", NULL, NULL, NULL, "/tmp", NULL },
 };

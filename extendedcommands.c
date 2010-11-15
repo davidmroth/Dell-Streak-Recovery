@@ -47,13 +47,16 @@
 
 int signature_check_enabled = 1;
 int script_assert_enabled = 1;
+char verifcation_status[PATH_MAX];
+
 static const char *SDCARD_PACKAGE_FILE = "SDCARD:update.zip";
 
 void
 toggle_signature_check()
 {
     signature_check_enabled = !signature_check_enabled;
-    ui_print("Signature Check: %s\n", signature_check_enabled ? "Enabled" : "Disabled");
+    sprintf(verifcation_status, "%s signature verification", signature_check_enabled ? "disable" : "enable");
+    //ui_print("Signature Check: %s\n", signature_check_enabled ? "Enabled" : "Disabled");
 }
 
 void toggle_script_asserts()
@@ -86,43 +89,42 @@ int install_zip(const char* packagefilepath)
     return 0;
 }
 
-
-char* INSTALL_MENU_ITEMS[] = {  "apply sdcard:update.zip",
-                                "choose zip from sdcard",
-                                "toggle signature verification",
-                                "toggle script asserts",
-                                NULL };
-#define ITEM_APPLY_SDCARD     0
-#define ITEM_CHOOSE_ZIP       1
-#define ITEM_SIG_CHECK        2
-#define ITEM_ASSERTS          3
-
 void show_install_update_menu()
 {
     static char* headers[] = {  "Apply update from .zip file on SD card",
                                 "",
                                 NULL 
     };
+
+
+    sprintf(verifcation_status, "%s signature verification", signature_check_enabled ? "disable" : "enable");
+    char* list[] = {  "apply sdcard:update.zip",
+                      "choose zip from sdcard",
+                      verifcation_status,
+                      //"toggle script asserts"
+                      NULL
+    };
+
     for (;;)
     {
-        int chosen_item = get_menu_selection(headers, INSTALL_MENU_ITEMS, 0);
+        int chosen_item = get_menu_selection(headers, list, 0);
         switch (chosen_item)
         {
-            case ITEM_ASSERTS:
-                toggle_script_asserts();
-                break;
-            case ITEM_SIG_CHECK:
-                toggle_signature_check();
-                break;
-            case ITEM_APPLY_SDCARD:
+            case 0:
             {
                 if (confirm_selection("Confirm install?", "Yes - Install /sdcard/update.zip"))
                     install_zip(SDCARD_PACKAGE_FILE);
                 break;
             }
-            //case ITEM_CHOOSE_ZIP:
-                //show_choose_zip_menu();
-                //break;
+            case 1:
+                show_choose_zip_menu();
+                break;
+            case 2:
+                toggle_signature_check();
+                break;
+            case 3:
+                toggle_script_asserts();
+                break;
             default:
                 return;
         }
@@ -256,11 +258,12 @@ char* choose_file_menu(const char* directory, const char* fileExtensionOrDirecto
     int i;
     char* return_value = NULL;
     int dir_len = strlen(directory);
-
     char** files = gather_files(directory, fileExtensionOrDirectory, &numFiles);
     char** dirs = NULL;
+
     if (fileExtensionOrDirectory != NULL)
         dirs = gather_files(directory, NULL, &numDirs);
+
     int total = numDirs + numFiles;
     if (total == 0)
     {
@@ -271,15 +274,14 @@ char* choose_file_menu(const char* directory, const char* fileExtensionOrDirecto
         char** list = (char**) malloc((total + 1) * sizeof(char*));
         list[total] = NULL;
 
+        for (i = 0 ; i < numFiles; i++)
+        {
+            list[i] = strdup(files[i] + dir_len);
+        }
 
         for (i = 0 ; i < numDirs; i++)
         {
-            list[i] = strdup(dirs[i] + dir_len);
-        }
-
-        for (i = 0 ; i < numFiles; i++)
-        {
-            list[numDirs + i] = strdup(files[i] + dir_len);
+            list[numFiles + i] = strdup(dirs[i] + dir_len);
         }
 
         for (;;)
@@ -287,10 +289,13 @@ char* choose_file_menu(const char* directory, const char* fileExtensionOrDirecto
             int chosen_item = get_menu_selection(headers, list, 0);
             if (chosen_item == GO_BACK)
                 break;
+
             static char ret[PATH_MAX];
-            if (chosen_item < numDirs)
+            //if (chosen_item < numDirs)
+            if (chosen_item > numFiles)
             {
-                char* subret = choose_file_menu(dirs[chosen_item], fileExtensionOrDirectory, headers);
+                //char* subret = choose_file_menu(dirs[chosen_item], fileExtensionOrDirectory, headers);
+                char* subret = choose_file_menu(dirs[chosen_item - numFiles], fileExtensionOrDirectory, headers);
                 if (subret != NULL)
                 {
                     strcpy(ret, subret);
@@ -299,7 +304,8 @@ char* choose_file_menu(const char* directory, const char* fileExtensionOrDirecto
                 }
                 continue;
             } 
-            strcpy(ret, files[chosen_item - numDirs]);
+            //strcpy(ret, files[chosen_item - numDirs]);
+            strcpy(ret, files[chosen_item]);
             return_value = ret;
             break;
         }
@@ -326,12 +332,14 @@ void show_choose_zip_menu()
     char* file = choose_file_menu("/sdcard/", ".zip", headers);
     if (file == NULL)
         return;
+
     char sdcard_package_file[1024];
     strcpy(sdcard_package_file, "SDCARD:");
     strcat(sdcard_package_file,  file + strlen("/sdcard/"));
     static char* confirm_install  = "Confirm install?";
     static char confirm[PATH_MAX];
     sprintf(confirm, "Yes - Install %s", basename(file));
+
     if (confirm_selection(confirm_install, confirm))
         install_zip(sdcard_package_file);
 }
@@ -366,7 +374,7 @@ __system(const char *command)
         sigprocmask(SIG_SETMASK, &omask, NULL);
         execve(_PATH_BSHELL, argp, environ);
     _exit(127);
-  }
+    }
 
     intsave = (sig_t)  bsd_signal(SIGINT, SIG_IGN);
     quitsave = (sig_t) bsd_signal(SIGQUIT, SIG_IGN);
@@ -400,10 +408,10 @@ void show_nandroid_restore_menu()
 void show_mount_usb_storage_menu()
 {
     char command[PATH_MAX];
-    sprintf(command, "echo %s > /sys/devices/platform/usb_mass_storage/lun0/file", SDCARD_DEVICE_PRIMARY);
+    sprintf(command, "echo %s > /sys/devices/platform/msm_hsusb/gadget/lun0/file", SDCARD_DEVICE_PRIMARY);
     __system(command);
     static char* headers[] = {  "USB Mass Storage device",
-                                "Leaving this menu unmount",
+                                "Leaving this menu to unmount",
                                 "your SD card from your PC.",
                                 "",
                                 NULL 
@@ -418,8 +426,7 @@ void show_mount_usb_storage_menu()
             break;
     }
     
-    __system("echo '' > /sys/devices/platform/usb_mass_storage/lun0/file");
-    __system("echo 0 > /sys/devices/platform/usb_mass_storage/lun0/enable");
+    __system("echo '' > /sys/devices/platform/msm_hsusb/gadget/lun0/file");
 }
 
 int confirm_selection(const char* title, const char* confirm)
@@ -474,7 +481,7 @@ int format_non_mtd_device(const char* root)
     sprintf(tmp, "rm -rf %s/.*", path);
     __system(tmp);
     
-    ensure_root_path_unmounted(root);
+    //ensure_root_path_unmounted(root);
     return 0;
 }
 
@@ -649,6 +656,7 @@ int run_and_remove_extendedcommand()
     sprintf(tmp, "cp %s /tmp/%s", EXTENDEDCOMMAND_SCRIPT, basename(EXTENDEDCOMMAND_SCRIPT));
     __system(tmp);
     remove(EXTENDEDCOMMAND_SCRIPT);
+
     int i = 0;
     for (i = 20; i > 0; i--) {
         ui_print("Waiting for SD Card to mount (%ds)\n", i);
@@ -658,7 +666,9 @@ int run_and_remove_extendedcommand()
         }
         sleep(1);
     }
+
     remove("/sdcard/.recoverycheckpoint");
+
     if (i == 0) {
         ui_print("Timed out waiting for SD card... continuing anyways.");
     }
@@ -711,7 +721,6 @@ void show_nandroid_advanced_restore_menu()
                             "Restore system",
                             "Restore data",
                             "Restore cache",
-                            "Restore sd-ext",
                             NULL
     };
 
@@ -736,10 +745,6 @@ void show_nandroid_advanced_restore_menu()
         case 3:
             if (confirm_selection(confirm_restore, "Yes - Restore cache"))
                 nandroid_restore(file, 0, 0, 0, 1, 0);
-            break;
-        case 4:
-            if (confirm_selection(confirm_restore, "Yes - Restore sd-ext"))
-                nandroid_restore(file, 0, 0, 0, 0, 1);
             break;
     }
 }
@@ -805,6 +810,9 @@ void show_advanced_menu()
 
     static char* list[] = { "nandroid",
                             "wipe dalvik cache",
+			    "wipe battery stats",
+                            "fix permissions",
+                            "mount sdcard via PC",
                             "report error",
                             //"key test",
                             NULL
@@ -824,21 +832,34 @@ void show_advanced_menu()
             {
                 if (0 != ensure_root_path_mounted("DATA:"))
                     break;
-                //ensure_root_path_mounted("SDEXT:");
-                ensure_root_path_mounted("CACHE:");
+
                 if (confirm_selection( "Confirm wipe?", "Yes - Wipe Dalvik Cache")) {
                     __system("rm -r /data/dalvik-cache");
-                    __system("rm -r /cache/dalvik-cache");
-                    //__system("rm -r /sd-ext/dalvik-cache");
                 }
-                ensure_root_path_unmounted("DATA:");
+                //ensure_root_path_unmounted("DATA:");
                 ui_print("Dalvik Cache wiped.\n");
                 break;
             }
             case 2:
-                handle_failure(1);
+                wipe_battery_stats();
                 break;
             case 3:
+            {
+                ensure_root_path_mounted("SYSTEM:");
+                ensure_root_path_mounted("DATA:");
+                ensure_root_path_mounted("USERDATA:");
+                ui_print("Fixing permissions...\n");
+                __system("fix_permissions");
+                ui_print("Done!\n");
+                break;
+            }
+            case 4:
+		show_mount_usb_storage_menu();
+                break;
+            case 5:
+                handle_failure();
+                break;
+            case 6:
             {
                 ui_print("Outputting key codes.\n");
                 ui_print("Go back to end debugging.\n");
@@ -897,21 +918,21 @@ void create_fstab()
     }
     write_fstab_root("CACHE:", file);
     write_fstab_root("DATA:", file);
-#ifdef HAS_DATADATA
-    write_fstab_root("DATADATA:", file);
-#endif
     write_fstab_root("SYSTEM:", file);
     write_fstab_root("SDCARD:", file);
-    write_fstab_root("SDEXT:", file);
     fclose(file);
 }
 */
-void handle_failure(int ret)
+void handle_failure()
 {
-    if (ret == 0)
+    /*if (ret == 0)
         return;
+
     if (0 != ensure_root_path_mounted("SDCARD:"))
         return;
+    */
+
+    ensure_root_path_mounted("SDCARD:");
     mkdir("/sdcard/recovery", S_IRWXU);
     __system("cp /tmp/recovery.log /sdcard/recovery.log");
     ui_print("/tmp/recovery.log was copied to /sdcard/recovery.log. Please open ROM Manager to report the issue.\n");

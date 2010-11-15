@@ -1,12 +1,3 @@
-extern int signature_check_enabled;
-extern int script_assert_enabled;
-
-void
-toggle_signature_check();
-
-void
-toggle_script_asserts();
-
 void
 show_choose_zip_menu();
 
@@ -40,3 +31,8 @@ show_advanced_menu();
 int
 format_non_mtd_device(const char* root);
 
+void
+handle_failure();
+
+int
+confirm_selection(const char* title, const char* confirm);

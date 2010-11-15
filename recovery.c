@@ -306,10 +306,17 @@ erase_root(const char *root) {
     return format_root_device(root);
 }
 
+static int
+erase_non_mtd_root(const char *root) {
+    ui_set_background(BACKGROUND_ICON_INSTALLING);
+    ui_show_indeterminate_progress();
+    ui_print("Formatting %s...\n", root);
+    return format_non_mtd_device(root);
+}
+
 static char**
 prepend_title(char** headers) {
-    char* title[] = { "Android system recovery <"
-                          EXPAND(RECOVERY_API_VERSION) "e>",
+    char* title[] = { "Android system recovery <" EXPAND(RECOVERY_API_VERSION) "e>",
                       "",
                       NULL };
 
@@ -407,8 +414,8 @@ wipe_data(int confirm) {
 
     ui_print("\n-- Wiping data...\n");
     device_wipe_data();
-    erase_root("DATA:");
-    erase_root("CACHE:");
+    erase_non_mtd_root("DATA:");
+    erase_non_mtd_root("CACHE:");
     ui_print("Data wipe complete.\n");
 }
 
@@ -432,6 +439,8 @@ prompt_and_wait() {
                 return;
 
             case ITEM_APPLY_SDCARD:
+                show_install_update_menu();
+                /*
                 ui_print("\n-- Install from sdcard...\n");
                 set_sdcard_update_bootloader_message();
                 int status = install_package(SDCARD_PACKAGE_FILE);
@@ -443,6 +452,7 @@ prompt_and_wait() {
                 } else {
                     ui_print("\nInstall from sdcard complete.\n");
                 }
+                */
                 break;
 
             case ITEM_WIPE_DATA:
@@ -452,7 +462,7 @@ prompt_and_wait() {
 
             case ITEM_WIPE_CACHE:
                 ui_print("\n-- Wiping cache...\n");
-                erase_root("CACHE:");
+                erase_non_mtd_root("CACHE:");
                 ui_print("Cache wipe complete.\n");
                 if (!ui_text_visible()) return;
                 break;
@@ -506,7 +516,7 @@ main(int argc, char **argv) {
     freopen(TEMPORARY_LOG_FILE, "a", stdout); setbuf(stdout, NULL);
     freopen(TEMPORARY_LOG_FILE, "a", stderr); setbuf(stderr, NULL);
     fprintf(stderr, "Starting recovery on %s", ctime(&start));
-
+    
     ui_init();
     ui_print(EXPAND(RECOVERY_VERSION)"\n");
     //get_args(&argc, &argv);

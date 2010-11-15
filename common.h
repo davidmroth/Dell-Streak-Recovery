@@ -22,6 +22,17 @@
 static char* SDCARD_PATH = "/sdcard";
 static char* BACKUP_PATH = "rom_backup";
 
+//Security Enable/Disable
+extern int signature_check_enabled;
+extern int script_assert_enabled;
+
+void
+toggle_signature_check();
+
+void
+toggle_script_asserts();
+
+
 // Initialize the graphics system.
 void ui_init();
 

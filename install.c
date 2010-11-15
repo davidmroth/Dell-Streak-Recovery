@@ -253,6 +253,8 @@ exit:
 int
 install_package(const char *root_path)
 {
+    int err;
+
     ui_set_background(BACKGROUND_ICON_INSTALLING);
     ui_print("Finding update package...\n");
     ui_show_indeterminate_progress();
@@ -272,6 +274,7 @@ install_package(const char *root_path)
     ui_print("Opening update package...\n");
     LOGI("Update file path: %s\n", path);
 
+if (signature_check_enabled) {
     int numKeys;
     RSAPublicKey* loadedKeys = load_keys(PUBLIC_KEYS_FILE, &numKeys);
     if (loadedKeys == NULL) {
@@ -286,15 +289,15 @@ install_package(const char *root_path)
             VERIFICATION_PROGRESS_FRACTION,
             VERIFICATION_PROGRESS_TIME);
 
-    int err;
     err = verify_file(path, loadedKeys, numKeys);
     free(loadedKeys);
     LOGI("verify_file returned %d\n", err);
     if (err != VERIFY_SUCCESS) {
         LOGE("signature verification failed\n");
+        LOGE("may need to disable signature verification\n");
         return INSTALL_CORRUPT;
     }
-
+}
     /* Try to open the package.
      */
     ZipArchive zip;
