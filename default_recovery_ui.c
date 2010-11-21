@@ -19,7 +19,9 @@
 #include "recovery_ui.h"
 #include "common.h"
 
-char* MENU_HEADERS[] = { "Android system recovery utility",
+char* MENU_HEADERS[] = { "Use volume keys to navigate",
+                         "Click the camera or menu button to select.",
+                         "the back key to exit menu items.",
                          "",
                          NULL };
 
@@ -27,33 +29,33 @@ char* MENU_ITEMS[] = { "reboot system now",
                        "apply sdcard:update.zip",
                        "wipe data/factory reset",
                        "wipe cache partition",
+                       "advanced",
                        NULL };
 
-int device_recovery_start() {
-    return 0;
-}
-
 int device_toggle_display(volatile char* key_pressed, int key_code) {
-    return key_code == KEY_HOME;
+    return key_pressed[KEY_POWER];
 }
 
 int device_reboot_now(volatile char* key_pressed, int key_code) {
-    return 0;
+    return key_pressed[KEY_VOLUMEDOWN] && key_pressed[KEY_VOLUMEUP] && key_pressed[KEY_POWER];
 }
 
 int device_handle_key(int key_code, int visible) {
     if (visible) {
         switch (key_code) {
-            case KEY_DOWN:
             case KEY_VOLUMEDOWN:
                 return HIGHLIGHT_DOWN;
 
-            case KEY_UP:
             case KEY_VOLUMEUP:
                 return HIGHLIGHT_UP;
 
-            case KEY_ENTER:
+            case KEY_MENU:
+            case KEY_FOCUS:
+            case KEY_CAMERA:
                 return SELECT_ITEM;
+
+            case KEY_BACK:
+		return GO_BACK;
         }
     }
 

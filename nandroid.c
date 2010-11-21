@@ -81,51 +81,6 @@ void compute_directory_stats(char* directory)
     ui_show_progress(1, 0);
 }
 
-int nandroid_backup_ext_partition_extended(const char* backup_path, char* root) {
-    int ret = 0;
-    char tmp[PATH_MAX];
-    char mount_point[PATH_MAX];
-
-    translate_root_path(root, mount_point, PATH_MAX);
-    char* name = basename(mount_point);
-    ui_print("DEBUG: mount_point = %s!\n", mount_point); //mount_point = "/data/"
-
-    struct stat file_info;
-    sprintf(tmp, "%s/%s/.hidenandroidprogress", SDCARD_PATH, BACKUP_PATH); //BACKUP_PATH = "rom_backup"
-    if (0 != stat(tmp, &file_info)) {
-        ui_print("DEBUG: not found - hidenandroidprogress = %s!\n", SDCARD_PATH); //SDCARD_PATH = "/sdcard"
-    }
-    
-    ui_print("Backing up %s...\n", name);
-    //if (0 != (ret = ensure_root_path_mounted(root) != 0)) {
-    //    ui_print("Can't mount %s!\n", mount_point);
-    //    return ret;
-    //}
-
-    //compute_directory_stats(mount_point);
-
-    sprintf(tmp, "%s/%s.img", backup_path, name); //backup_path = full dir and time/name = "data"
-    ui_print("Backing to %s...\n", tmp);
-    
-    char* cmd[3];
-
-    cmd[0] = "";
-    cmd[1] = "if=/dev/block/dev/block/innersd0p5";
-    sprintf(cmd[2], "of=%s", tmp);
-
-    ret = dd_main(3, cmd);
-    ui_print("dd_main ret = %d\n", ret);
-    //ret = 0;
-
-    //ensure_root_path_unmounted(root);
-
-    if (0 != ret) {
-        ui_print("Error while making a ext image of %s!\n", mount_point);
-        return ret;
-    }
-    return 0;
-}
-
 int nandroid_backup_partition_extended(const char* backup_path, char* root, int umount_when_finished) {
     int ret = 0;
     char tmp[PATH_MAX];
@@ -217,7 +172,7 @@ int nandroid_backup(const char* backup_path)
     }
     else
     {
-        if (0 != (ret = nandroid_backup_partition_extended(backup_path, "SDCARD:/.android_secure", 0)))
+        if (0 != (ret = nandroid_backup_partition_extended(backup_path, "ANDROID_SECURE:", 0)))
             return ret;
     }
 
@@ -266,12 +221,12 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* roo
     }
 
     ui_print("Restoring %s...\n", name);
-    /*
+
     if (0 != (ret = ensure_root_path_unmounted(root))) {
         ui_print("Can't unmount %s!\n", mount_point);
         return ret;
     }
-    */
+
     if (0 != (ret = format_root_device(root))) {
         ui_print("Error while formatting %s!\n", root);
         return ret;
@@ -282,6 +237,7 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* roo
         return ret;
     }
     
+    sprintf(tmp, "%s/%s.img", backup_path, name);
     if (0 != (ret = unyaffs(tmp, mount_point, callback))) {
         ui_print("Error while restoring %s!\n", mount_point);
         return ret;
@@ -337,7 +293,7 @@ int nandroid_restore(const char* backup_path, int restore_boot, int restore_syst
     if (restore_cache && 0 != (ret = nandroid_restore_partition_extended(backup_path, "CACHE:", 0)))
         return ret;
 
-    if (restore_data && 0 != (ret = nandroid_restore_partition_extended(backup_path, "SDCARD:/.android_secure", 0)))
+    if (restore_data && 0 != (ret = nandroid_restore_partition_extended(backup_path, "ANDROID_SECURE:", 0)))
         return ret;
 
     sync();

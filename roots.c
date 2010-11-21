@@ -36,16 +36,29 @@ static const char g_mtd_device[] = "@\0g_mtd_device";
 static const char g_raw[] = "@\0g_raw";
 static const char g_package_file[] = "@\0g_package_file";
 
+/*
+typedef struct {
+	const char *name;
+	const char *device;
+	const char *device2;  // If the first one doesn't work (may be NULL)
+	const char *partition_name;
+	const char *mount_point;
+	const char *filesystem;
+	const char *filesystem_options;
+} RootInfo;
+*/
+
 static RootInfo g_roots[] = {
     { "BOOT:", g_mtd_device, NULL, "boot", NULL, g_raw },
     { "RECOVERY:", g_mtd_device, NULL, "recovery", "/", g_raw },
+    { "LOGFILTER:", g_mtd_device, NULL, "LogFilter", NULL, g_raw },
     { "SYSTEM:", g_mtd_device, NULL, "system", "/system", "yaffs2" },
     { "USERDATA:", g_mtd_device, NULL, "userdata", "/firstboot", "yaffs2" },
     { "OEM_LOG:", g_mtd_device, NULL, "oem_log", NULL, g_raw },
-    { "LOGFILTER:", g_mtd_device, NULL, "LogFilter", NULL, g_raw },
     { "CACHE:", "/dev/block/innersd0p5", NULL, NULL, "/cache", "ext3" },
     { "DATA:", "/dev/block/innersd0p6", NULL, NULL, "/data", "ext3" },
     { "SDCARD:", "/dev/block/mmcblk1p1", NULL, NULL, "/sdcard", "vfat" },
+    { "ANDROID_SECURE:", "/sdcard/.android_secure", NULL, NULL, "/sdcard/.android_secure", "folder" },
     { "PACKAGE:", NULL, NULL, NULL, NULL, g_package_file },
     { "MBM:", g_mtd_device, NULL, "mbm", NULL, g_raw },
     { "TMP:", NULL, NULL, NULL, "/tmp", NULL },
@@ -174,7 +187,7 @@ internal_root_mounted(const RootInfo *info)
     if (info->mount_point == NULL) {
         return -1;
     }
-//xxx if TMP: (or similar) just say "yes"
+    //xxx if TMP: (or similar) just say "yes"
 
     /* See if this root is already mounted.
      */
@@ -241,6 +254,12 @@ ensure_root_path_mounted(const char *root_path)
         return -1;
     }
 
+    //Added
+    if(strcmp(info->filesystem, "folder") == 0) {
+    	mkdir(info->mount_point, 0755);  // in case it doesn't already exist
+	return 0;
+    }
+
     mkdir(info->mount_point, 0755);  // in case it doesn't already exist
     if (mount(info->device, info->mount_point, info->filesystem,
             MS_NOATIME | MS_NODEV | MS_NODIRATIME, "")) {
@@ -269,7 +288,7 @@ ensure_root_path_unmounted(const char *root_path)
          */
         return 0;
     }
-//xxx if TMP: (or similar) just return error
+    //xxx if TMP: (or similar) just return error
 
     /* See if this root is already mounted.
      */
@@ -358,8 +377,11 @@ format_root_device(const char *root)
                 return 0;
             }
         }
+    } else {
+	return format_non_mtd_device(root);
     }
-//TODO: handle other device types (sdcard, etc.)
+
+    //TODO: handle other device types (sdcard, etc.)
     LOGW("format_root_device: can't handle non-mtd device \"%s\"\n", root);
     return -1;
 }

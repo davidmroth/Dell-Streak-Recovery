@@ -46,17 +46,39 @@
 #include "nandroid.h"
 
 int signature_check_enabled = 1;
-int script_assert_enabled = 1;
 char verifcation_status[PATH_MAX];
 
+int script_assert_enabled = 1;
+
+//Non-volital Setting
+static const char *NO_VERIFY = "CACHE:recovery/.no_verify";
 static const char *SDCARD_PACKAGE_FILE = "SDCARD:update.zip";
 
-void
-toggle_signature_check()
+void toggle_signature_check()
 {
+    FILE *file;
+    char path[PATH_MAX] = "";
+
+    ensure_root_path_mounted(NO_VERIFY);
     signature_check_enabled = !signature_check_enabled;
+
+    LOGI("Setting location: %s\n", NO_VERIFY);
+    if (translate_root_path(NO_VERIFY, path, sizeof(path)) == NULL) {
+       LOGE("Bad path %s\n", NO_VERIFY);
+       exit(1);
+    }
+
+    if (signature_check_enabled) {
+	if (remove(path)) LOGE("Error removing: %s\n", path);
+        LOGI("Signature check enabled (removing: %s).\n", path);
+    } else {
+        file = fopen(path, "w");
+        fclose(file);
+        LOGI("Signature check disabled (creating: %s).\n", path);
+    }
+
+    //Change menu display
     sprintf(verifcation_status, "%s signature verification", signature_check_enabled ? "disable" : "enable");
-    //ui_print("Signature Check: %s\n", signature_check_enabled ? "Enabled" : "Disabled");
 }
 
 void toggle_script_asserts()
@@ -89,15 +111,39 @@ int install_zip(const char* packagefilepath)
     return 0;
 }
 
+int is_setting_enabled(char* filename)
+{
+    struct stat file_info;
+    char path[PATH_MAX] = "";
+    int enabled;
+
+    if (translate_root_path(NO_VERIFY, path, sizeof(path)) == NULL) {
+        LOGE("Bad path %s\n", NO_VERIFY);
+        exit(1);
+    }
+
+    if (0 == stat(path, &file_info))
+       enabled = 0;
+
+    else
+       enabled = 1;
+
+
+    return enabled;
+}
+
 void show_install_update_menu()
 {
+    int chosen_item;
     static char* headers[] = {  "Apply update from .zip file on SD card",
                                 "",
                                 NULL 
     };
 
-
+    //Add toggle verication logic
+    signature_check_enabled = is_setting_enabled(NO_VERIFY);
     sprintf(verifcation_status, "%s signature verification", signature_check_enabled ? "disable" : "enable");
+
     char* list[] = {  "apply sdcard:update.zip",
                       "choose zip from sdcard",
                       verifcation_status,
@@ -107,7 +153,8 @@ void show_install_update_menu()
 
     for (;;)
     {
-        int chosen_item = get_menu_selection(headers, list, 0);
+        chosen_item = get_menu_selection(headers, list, 0);
+
         switch (chosen_item)
         {
             case 0:
@@ -116,19 +163,22 @@ void show_install_update_menu()
                     install_zip(SDCARD_PACKAGE_FILE);
                 break;
             }
+
             case 1:
                 show_choose_zip_menu();
                 break;
+
             case 2:
                 toggle_signature_check();
                 break;
+
             case 3:
                 toggle_script_asserts();
                 break;
+
             default:
                 return;
         }
-        
     }
 }
 
@@ -169,52 +219,60 @@ char** gather_files(const char* directory, const char* fileExtensionOrDirectory,
         extension_length = strlen(fileExtensionOrDirectory);
   
     int isCounting = 1;
+
     i = 0;
     for (pass = 0; pass < 2; pass++) {
-        while ((de=readdir(dir)) != NULL) {
+        while ((de = readdir(dir)) != NULL) {
+
             // skip hidden files
             if (de->d_name[0] == '.')
                 continue;
             
             // NULL means that we are gathering directories, so skip this
-            if (fileExtensionOrDirectory != NULL)
-            {
+            if (fileExtensionOrDirectory != NULL) {
+
                 // make sure that we can have the desired extension (prevent seg fault)
                 if (strlen(de->d_name) < extension_length)
                     continue;
+
                 // compare the extension
                 if (strcmp(de->d_name + strlen(de->d_name) - extension_length, fileExtensionOrDirectory) != 0)
                     continue;
-            }
-            else
-            {
+
+            } else {
+
                 struct stat info;
                 char fullFileName[PATH_MAX];
+
                 strcpy(fullFileName, directory);
                 strcat(fullFileName, de->d_name);
                 stat(fullFileName, &info);
+
                 // make sure it is a directory
                 if (!(S_ISDIR(info.st_mode)))
                     continue;
             }
             
-            if (pass == 0)
-            {
+            if (pass == 0) {
                 total++;
                 continue;
             }
             
             files[i] = (char*) malloc(dirLen + strlen(de->d_name) + 2);
+
             strcpy(files[i], directory);
             strcat(files[i], de->d_name);
             if (fileExtensionOrDirectory == NULL)
                 strcat(files[i], "/");
+
             i++;
         }
+
         if (pass == 1)
             break;
         if (total == 0)
             break;
+
         rewinddir(dir);
         *numFiles = total;
         files = (char**) malloc((total+1)*sizeof(char*));
@@ -244,6 +302,14 @@ char** gather_files(const char* directory, const char* fileExtensionOrDirectory,
 		}
 	}
 
+    /*LOGI("Listing %d files and dir:\n", total);
+    int len=sizeof(files)/sizeof(char*);
+    int x;
+    for(x = 0; x < len; x++) {
+       LOGI("%s\n", files[x]);
+       LOGI("\n\n");
+    }*/
+
     return files;
 }
 
@@ -268,47 +334,44 @@ char* choose_file_menu(const char* directory, const char* fileExtensionOrDirecto
     if (total == 0)
     {
         ui_print("No files found.\n");
-    }
-    else
-    {
+    } else {
         char** list = (char**) malloc((total + 1) * sizeof(char*));
         list[total] = NULL;
 
-        for (i = 0 ; i < numFiles; i++)
-        {
+        for (i = 0 ; i < numFiles; i++) {
             list[i] = strdup(files[i] + dir_len);
         }
 
-        for (i = 0 ; i < numDirs; i++)
-        {
+        for (i = 0 ; i < numDirs; i++) {
             list[numFiles + i] = strdup(dirs[i] + dir_len);
         }
 
-        for (;;)
-        {
+        for (;;) {
             int chosen_item = get_menu_selection(headers, list, 0);
             if (chosen_item == GO_BACK)
                 break;
 
             static char ret[PATH_MAX];
             //if (chosen_item < numDirs)
-            if (chosen_item > numFiles)
-            {
+            if (chosen_item > numFiles) {
                 //char* subret = choose_file_menu(dirs[chosen_item], fileExtensionOrDirectory, headers);
                 char* subret = choose_file_menu(dirs[chosen_item - numFiles], fileExtensionOrDirectory, headers);
-                if (subret != NULL)
-                {
+
+                if (subret != NULL) {
                     strcpy(ret, subret);
                     return_value = ret;
                     break;
                 }
+
                 continue;
             } 
+
             //strcpy(ret, files[chosen_item - numDirs]);
             strcpy(ret, files[chosen_item]);
             return_value = ret;
             break;
         }
+
         free_string_array(list);
     }
 
@@ -476,9 +539,9 @@ int format_non_mtd_device(const char* root)
     }
 
     static char tmp[PATH_MAX];
-    sprintf(tmp, "rm -rf %s/*", path);
+    sprintf(tmp, "rm -rf %s/* >/dev/null", path);
     __system(tmp);
-    sprintf(tmp, "rm -rf %s/.*", path);
+    sprintf(tmp, "rm -rf %s/.* >/dev/null", path);
     __system(tmp);
     
     //ensure_root_path_unmounted(root);
@@ -502,7 +565,6 @@ void show_partition_menu()
         { "mount /data", "unmount /data", "DATA:" },
         { "mount /cache", "unmount /cache", "CACHE:" },
         { "mount /sdcard", "unmount /sdcard", "SDCARD:" }
-        //{ "mount /sd-ext", "unmount /sd-ext", "SDEXT:" }
         };
         
     string mtds[MTD_COUNT][2] = {
@@ -717,10 +779,10 @@ void show_nandroid_advanced_restore_menu()
                                 NULL
     };
 
-    static char* list[] = { "Restore boot",
-                            "Restore system",
-                            "Restore data",
-                            "Restore cache",
+    static char* list[] = { "restore boot",
+                            "restore system",
+                            "restore data",
+                            "restore cache",
                             NULL
     };
 
@@ -756,9 +818,9 @@ void show_nandroid_menu()
                                 NULL 
     };
 
-    static char* list[] = { "Backup", 
-                            "Restore",
-                            "Advanced Restore",
+    static char* list[] = { "backup", 
+                            "restore",
+                            "advanced restore",
                             NULL
     };
 
@@ -830,13 +892,13 @@ void show_advanced_menu()
                break;
             case 1:
             {
-                if (0 != ensure_root_path_mounted("DATA:"))
-                    break;
-
                 if (confirm_selection( "Confirm wipe?", "Yes - Wipe Dalvik Cache")) {
+                    if (0 != ensure_root_path_mounted("DATA:"))
+                        break;
+
                     __system("rm -r /data/dalvik-cache");
                 }
-                //ensure_root_path_unmounted("DATA:");
+                ensure_root_path_unmounted("DATA:");
                 ui_print("Dalvik Cache wiped.\n");
                 break;
             }
@@ -878,51 +940,6 @@ void show_advanced_menu()
     }
 }
 
-/*void write_fstab_root(char *root_path, FILE *file)
-{
-    RootInfo *info = get_root_info_for_path(root_path);
-    if (info == NULL) {
-        LOGW("Unable to get root info for %s during fstab generation!", root_path);
-        return;
-    }
-    MtdPartition *mtd = get_root_mtd_partition(root_path);
-    if (mtd != NULL)
-    {
-        fprintf(file, "/dev/block/mtdblock%d ", mtd->device_index);
-    }
-    else
-    {
-        // only SDCARD: seems to be using device2. 
-        // and mmcblkXp1 is the fallback/device2.
-        // However, generally, mmcblkXp1 is usually where the
-        // FAT partition is located... so favor that.
-        if (NULL == info->device2)
-            fprintf(file, "%s ", info->device);
-        else
-            fprintf(file, "%s ", info->device2);
-    }
-    
-    fprintf(file, "%s ", info->mount_point);
-    fprintf(file, "%s %s\n", info->filesystem, info->filesystem_options == NULL ? "rw" : info->filesystem_options); 
-}
-*/
-
-/*
-void create_fstab()
-{
-    __system("touch /etc/mtab");
-    FILE *file = fopen("/etc/fstab", "w");
-    if (file == NULL) {
-        LOGW("Unable to create /etc/fstab!");
-        return;
-    }
-    write_fstab_root("CACHE:", file);
-    write_fstab_root("DATA:", file);
-    write_fstab_root("SYSTEM:", file);
-    write_fstab_root("SDCARD:", file);
-    fclose(file);
-}
-*/
 void handle_failure()
 {
     /*if (ret == 0)
