@@ -42,7 +42,10 @@
 #include "roots.h"
 #include "verifier.h"
 
+#include "amend/amend.h"
+
 #define ASSUMED_UPDATE_BINARY_NAME  "META-INF/com/google/android/update-binary"
+#define ASSUMED_UPDATE_SCRIPT_NAME  "META-INF/com/google/android/update-script"
 #define PUBLIC_KEYS_FILE "/res/keys"
 
 // If the package contains an update binary, extract it and run it.
@@ -51,7 +54,7 @@ try_update_binary(const char *path, ZipArchive *zip) {
     const ZipEntry* binary_entry =
             mzFindZipEntry(zip, ASSUMED_UPDATE_BINARY_NAME);
     if (binary_entry == NULL) {
-        return INSTALL_CORRUPT;
+        return INSTALL_UPDATE_BINARY_MISSING;
     }
 
     char* binary = "/tmp/update_binary";
@@ -165,13 +168,106 @@ try_update_binary(const char *path, ZipArchive *zip) {
     return INSTALL_SUCCESS;
 }
 
+static int read_data(ZipArchive *zip, const ZipEntry *entry,
+        char** ppData, int* pLength) {
+    int len = (int)mzGetZipEntryUncompLen(entry);
+    if (len <= 0) {
+        LOGE("Bad data length %d\n", len);
+        return -1;
+    }
+    char *data = malloc(len + 1);
+    if (data == NULL) {
+        LOGE("Can't allocate %d bytes for data\n", len + 1);
+        return -2;
+    }
+    bool ok = mzReadZipEntry(zip, entry, data, len);
+    if (!ok) {
+        LOGE("Error while reading data\n");
+        free(data);
+        return -3;
+    }
+    data[len] = '\0';     // not necessary, but just to be safe
+    *ppData = data;
+    if (pLength) {
+        *pLength = len;
+    }
+    return 0;
+}
+
+const ZipEntry *
+find_update_script(ZipArchive *zip)
+{
+//TODO: Get the location of this script from the MANIFEST.MF file
+    return mzFindZipEntry(zip, ASSUMED_UPDATE_SCRIPT_NAME);
+}
+
+int
+handle_update_script(ZipArchive *zip, const ZipEntry *update_script_entry)
+{
+    /* Read the entire script into a buffer.
+     */
+    int script_len;
+    char* script_data;
+    if (read_data(zip, update_script_entry, &script_data, &script_len) < 0) {
+        LOGE("Can't read update script\n");
+        return INSTALL_UPDATE_SCRIPT_MISSING;
+    }
+
+    /* Parse the script.  Note that the script and parse tree are never freed.
+     */
+    const AmCommandList *commands = parseAmendScript(script_data, script_len);
+    if (commands == NULL) {
+        LOGE("Syntax error in update script\n");
+        return INSTALL_ERROR;
+    } else {
+        UnterminatedString name = mzGetZipEntryFileName(update_script_entry);
+        LOGI("Parsed %.*s\n", name.len, name.str);
+    }
+
+    /* Execute the script.
+     */
+    int ret = execCommandList((ExecContext *)1, commands);
+    if (ret != 0) {
+        int num = ret;
+        char *line, *next = script_data;
+        while (next != NULL && ret-- > 0) {
+            line = next;
+            next = memchr(line, '\n', script_data + script_len - line);
+            if (next != NULL) *next++ = '\0';
+        }
+        LOGE("Failure at line %d:\n%s\n", num, next ? line : "(not found)");
+        return INSTALL_ERROR;
+    }
+
+    ui_print("Installation complete.\n");
+    return INSTALL_SUCCESS;
+}
+
 static int
 handle_update_package(const char *path, ZipArchive *zip)
 {
     // Update should take the rest of the progress bar.
     ui_print("Installing update...\n");
 
+    LOGI("Trying update-binary.\n");
     int result = try_update_binary(path, zip);
+
+    if (result == INSTALL_UPDATE_BINARY_MISSING)
+    {
+        LOGI("No update-binary found.\n");
+        register_package_root(NULL, NULL);  // Unregister package root
+        if (register_package_root(zip, path) < 0) {
+            LOGE("Can't register package root\n");
+            return INSTALL_ERROR;
+        }
+        const ZipEntry *script_entry;
+        script_entry = find_update_script(zip);
+        LOGI("Trying update-script.\n");
+        result = handle_update_script(zip, script_entry);
+        if (result == INSTALL_UPDATE_SCRIPT_MISSING)
+            result = INSTALL_ERROR;
+    }
+
     register_package_root(NULL, NULL);  // Unregister package root
     return result;
 }

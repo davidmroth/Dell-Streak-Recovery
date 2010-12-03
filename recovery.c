@@ -41,6 +41,7 @@
 
 #include "roots.h"
 #include "recovery_ui.h"
+#include "commands.h"
 
 static const struct option OPTIONS[] = {
   { "send_intent", required_argument, NULL, 's' },
@@ -552,6 +553,12 @@ main(int argc, char **argv) {
     fprintf(stderr, "\n");
 
     int status = INSTALL_SUCCESS;
+
+    //Register amend commands
+    RecoveryCommandContext ctx = { NULL };
+    if (register_update_commands(&ctx)) {
+        LOGE("Can't install update commands\n");
+    }
 
     if (update_package != NULL) {
         status = install_package(update_package);
