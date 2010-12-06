@@ -1,6 +1,9 @@
 void
 show_choose_zip_menu();
 
+int 
+erase_root(const char *root);
+
 int
 do_nandroid_backup(const char* backup_name);
 
@@ -36,3 +39,6 @@ handle_failure();
 
 int
 confirm_selection(const char* title, const char* confirm);
+
+void
+show_install_update_menu();

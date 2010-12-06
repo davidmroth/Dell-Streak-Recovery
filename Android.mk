@@ -36,7 +36,7 @@ LOCAL_FORCE_STATIC_EXECUTABLE := true
 RECOVERY_API_VERSION := 2
 LOCAL_CFLAGS += -DRECOVERY_API_VERSION=$(RECOVERY_API_VERSION)
 
-RECOVERY_VERSION := v0.3.1.3
+RECOVERY_VERSION := v0.3.2
 LOCAL_CFLAGS += -DRECOVERY_VERSION="$(RECOVERY_VERSION)"
 
 
@@ -64,7 +64,7 @@ LOCAL_MODULE_PATH := $(TARGET_RECOVERY_ROOT_OUT)/sbin
 LOCAL_UNSTRIPPED_PATH := $(PRODUCT_OUT)/symbols/recovery
 
 #Pickup by build/core/Makefile
-RECOVERY_LINKS := amend busybox flash_image dump_image mkyaffs2image unyaffs erase_image nandroid reboot setprop getprop
+RECOVERY_LINKS := busybox flash_image dump_image mkyaffs2image unyaffs erase_image nandroid reboot setprop getprop
 
 include $(BUILD_EXECUTABLE)
 
@@ -73,6 +73,7 @@ include $(BUILD_EXECUTABLE)
 include $(commands_recovery_local_path)/mtdutils/Android.mk
 include $(commands_recovery_local_path)/amend/Android.mk
 include $(commands_recovery_local_path)/prebuilt/Android.mk
+
 commands_recovery_local_path :=
 
 endif   # TARGET_ARCH == arm

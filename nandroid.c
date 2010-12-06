@@ -55,6 +55,8 @@ int print_and_error(char* message) {
 
 int yaffs_files_total = 0;
 int yaffs_files_count = 0;
+
+
 void yaffs_callback(char* filename)
 {
     char* justfile = basename(filename);
@@ -102,6 +104,7 @@ int nandroid_backup_partition_extended(const char* backup_path, char* root, int 
         ui_print("Can't mount %s!\n", mount_point);
         return ret;
     }
+
     compute_directory_stats(mount_point);
 
     sprintf(tmp, "%s/%s.img", backup_path, name);
@@ -129,13 +132,16 @@ int nandroid_backup(const char* backup_path)
     
     int ret;
     struct statfs s;
+
     if (0 != (ret = statfs(SDCARD_PATH, &s)))
         return print_and_error("Unable to stat /sdcard\n");
+
     uint64_t bavail = s.f_bavail;
     uint64_t bsize = s.f_bsize;
     uint64_t sdcard_free = bavail * bsize;
     uint64_t sdcard_free_mb = sdcard_free / (uint64_t)(1024 * 1024);
     ui_print("SD Card space free: %lluMB\n", sdcard_free_mb);
+
     if (sdcard_free_mb < 150)
         ui_print("There may not be enough free space to complete backup... continuing...\n");
     
@@ -162,6 +168,9 @@ int nandroid_backup(const char* backup_path)
         return ret;
 
     if (0 != (ret = nandroid_backup_partition_extended(backup_path, "CACHE:", 0)))
+        return ret;
+
+    if (0 != (ret = nandroid_backup_partition_extended(backup_path, "USERDATA:", 0)))
         return ret;
 
     sprintf(tmp, "%s/.android_secure", SDCARD_PATH);
@@ -207,7 +216,7 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* roo
     char tmp[PATH_MAX];
     sprintf(tmp, "%s/%s.img", backup_path, name);
     struct stat file_info;
-    if (0 != (ret = statfs(tmp, &file_info))) {
+    if (0 != (ret = stat(tmp, &file_info))) {
         ui_print("%s.img not found. Skipping restore of %s.\n", name, mount_point);
         return 0;
     }
@@ -254,7 +263,7 @@ int nandroid_restore_partition(const char* backup_path, const char* root) {
     return nandroid_restore_partition_extended(backup_path, root, 1);
 }
 
-int nandroid_restore(const char* backup_path, int restore_boot, int restore_system, int restore_data, int restore_cache, int restore_sdext)
+int nandroid_restore(const char* backup_path, int restore_boot, int restore_system, int restore_data, int restore_cache, int restore_userdata, int restore_android_secure)
 {
     ui_set_background(BACKGROUND_ICON_INSTALLING);
     ui_show_indeterminate_progress();
@@ -287,14 +296,26 @@ int nandroid_restore(const char* backup_path, int restore_boot, int restore_syst
     if (restore_system && 0 != (ret = nandroid_restore_partition(backup_path, "SYSTEM:")))
         return ret;
 
-    if (restore_data && 0 != (ret = nandroid_restore_partition(backup_path, "DATA:")))
-        return ret;
-
     if (restore_cache && 0 != (ret = nandroid_restore_partition_extended(backup_path, "CACHE:", 0)))
         return ret;
 
-    if (restore_data && 0 != (ret = nandroid_restore_partition_extended(backup_path, "ANDROID_SECURE:", 0)))
+    if (restore_userdata && 0 != (ret = nandroid_restore_partition(backup_path, "USERDATA:")))
         return ret;
+
+    if (restore_data && 0 != (ret = nandroid_restore_partition(backup_path, "DATA:")))
+    {
+        return ret;
+    } 
+    else 
+    {
+        ui_print("Data restore complete. Checking and repairing permissions...\n");
+        __system("fix_permissions");
+    }
+
+    if (restore_android_secure && 0 != (ret = nandroid_restore_partition_extended(backup_path, "ANDROID_SECURE:", 0))) 
+       return ret;
+
+        
 
     sync();
     ui_set_background(BACKGROUND_ICON_NONE);
@@ -307,18 +328,20 @@ void nandroid_generate_timestamp_path(char* backup_path)
 {
     time_t t = time(NULL);
     struct tm *tmp = localtime(&t);
+    char path[PATH_MAX];
+    char time_path[PATH_MAX];
 
-    sprintf(tmp, "%s/%s", SDCARD_PATH, BACKUP_PATH);
     if (tmp == NULL)
     {
         struct timeval tp;
         gettimeofday(&tp, NULL);
-        sprintf(backup_path, "%s/%d", tmp, (int)tp.tv_sec);
+        sprintf(backup_path, "%s/%s/%d", SDCARD_PATH, BACKUP_PATH, (int)tp.tv_sec);
     }
     else
     {
-        strftime(backup_path, PATH_MAX, "%F.%H.%M.%S", tmp);
-        sprintf(backup_path, "%s/%s/%s",SDCARD_PATH, BACKUP_PATH, backup_path);
+        sprintf(path, "%s/%s", SDCARD_PATH, BACKUP_PATH);
+        strftime(time_path, PATH_MAX, "%F.%H.%M.%S", tmp);
+        sprintf(backup_path, "%s/%s", path, time_path);
     }
 }
 
@@ -348,7 +371,7 @@ int nandroid_main(int argc, char** argv)
     {
         if (argc != 3)
             return nandroid_usage();
-        return nandroid_restore(argv[2], 1, 1, 1, 1, 1);
+        return nandroid_restore(argv[2], 1, 1, 1, 1, 1, 1);
     }
     
     return nandroid_usage();

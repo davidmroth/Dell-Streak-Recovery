@@ -144,7 +144,7 @@ command :   TOK_IDENTIFIER
                 {
                     Command *cmd = findCommand($1);
                     if (cmd == NULL) {
-                        fprintf(stderr, "Unknown command -> \"%s\"\n", $1);
+                        fprintf(stderr, "Unknown command \"%s\"\n", $1);
                         YYABORT;
                     }
                     $$ = (AmCommand *)malloc(sizeof(AmCommand));

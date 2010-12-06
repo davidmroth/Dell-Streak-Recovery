@@ -75,6 +75,7 @@ int device_wipe_data();
 
 
 //Dell Streak Fix
+#undef KEY_POWER
 #define KEY_POWER 107
 #define KEY_FOCUS 59
 
@@ -91,4 +92,5 @@ void
 set_sdcard_update_bootloader_message();
 
 
+int erase_root(const char *root);
 #endif

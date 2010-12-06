@@ -42,6 +42,20 @@
 #include "roots.h"
 #include "recovery_ui.h"
 #include "commands.h"
+#include "extendedcommands.h"
+
+
+extern int flash_image_main(int argc, char **argv);
+extern int dump_image_main(int argc, char **argv);
+extern int erase_image_main(int argc, char **argv);
+extern int mkyaffs2image_main(int argc, char **argv);
+extern int unyaffs_main(int argc, char **argv);
+extern int nandroid_main(int argc, char **argv);
+extern int reboot_main(int argc, char **argv);
+extern int setprop_main(int argc, char **argv);
+extern int getprop_main(int argc, char **argv);
+extern int busybox_driver(int argc, char **argv);
+
 
 static const struct option OPTIONS[] = {
   { "send_intent", required_argument, NULL, 's' },
@@ -56,6 +70,9 @@ static const char *INTENT_FILE = "CACHE:recovery/intent";
 static const char *LOG_FILE = "CACHE:recovery/log";
 static const char *SDCARD_PACKAGE_FILE = "SDCARD:update.zip";
 static const char *TEMPORARY_LOG_FILE = "/tmp/recovery.log";
+
+
+
 
 /*
  * The recovery tool communicates with the main system through /cache files.
@@ -299,22 +316,6 @@ finish_recovery(const char *send_intent) {
     sync();  // For good measure.
 }
 
-static int
-erase_root(const char *root) {
-    ui_set_background(BACKGROUND_ICON_INSTALLING);
-    ui_show_indeterminate_progress();
-    ui_print("Formatting %s...\n", root);
-    return format_root_device(root);
-}
-
-static int
-erase_non_mtd_root(const char *root) {
-    ui_set_background(BACKGROUND_ICON_INSTALLING);
-    ui_show_indeterminate_progress();
-    ui_print("Formatting %s...\n", root);
-    return format_non_mtd_device(root);
-}
-
 static char**
 prepend_title(char** headers) {
     char* title[] = { "Android system recovery <" EXPAND(RECOVERY_API_VERSION) "e>",
@@ -401,7 +402,7 @@ wipe_data(int confirm) {
                           " No",
                           " No",
                           " No",
-                          " Yes -- delete all user data",   // [7]
+                          " Yes - Delete all user data",   // [7]
                           " No",
                           " No",
                           " No",
@@ -415,8 +416,8 @@ wipe_data(int confirm) {
 
     ui_print("\n-- Wiping data...\n");
     device_wipe_data();
-    erase_non_mtd_root("DATA:");
-    erase_non_mtd_root("CACHE:");
+    erase_root("DATA:");
+    erase_root("CACHE:");
     ui_print("Data wipe complete.\n");
 }
 
@@ -427,6 +428,7 @@ prompt_and_wait() {
     for (;;) {
         finish_recovery(NULL);
         ui_reset_progress();
+        ui_set_background(BACKGROUND_ICON_ERROR);
 
         int chosen_item = get_menu_selection(headers, MENU_ITEMS, 0);
 
@@ -463,7 +465,7 @@ prompt_and_wait() {
 
             case ITEM_WIPE_CACHE:
                 ui_print("\n-- Wiping cache...\n");
-                erase_non_mtd_root("CACHE:");
+                erase_root("CACHE:");
                 ui_print("Cache wipe complete.\n");
                 if (!ui_text_visible()) return;
                 break;
@@ -495,8 +497,6 @@ main(int argc, char **argv) {
                 return mkyaffs2image_main(argc, argv);
             if (strstr(argv[0], "unyaffs") != NULL)
                 return unyaffs_main(argc, argv);
-            if (strstr(argv[0], "amend"))
-                return amend_main(argc, argv);
             if (strstr(argv[0], "nandroid"))
                 return nandroid_main(argc, argv);
             if (strstr(argv[0], "reboot"))
@@ -507,8 +507,6 @@ main(int argc, char **argv) {
                 return getprop_main(argc, argv);
             return busybox_driver(argc, argv);
         }
-    //__system("/sbin/postrecoveryboot.sh");
-    //create_fstab();
     
     int is_user_initiated_recovery = 0;
     time_t start = time(NULL);
@@ -575,7 +573,6 @@ main(int argc, char **argv) {
         status = INSTALL_ERROR;  // No command specified
     }
 
-    if (status != INSTALL_SUCCESS) ui_set_background(BACKGROUND_ICON_ERROR);
     if (status != INSTALL_SUCCESS || ui_text_visible()) prompt_and_wait();
 
     // Otherwise, get ready to boot the main system...

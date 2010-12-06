@@ -28,6 +28,7 @@
 #include "mtdutils.h"
 #include "mounts.h"
 #include "Zip.h"
+#include "extendedcommands.h"
 
 /* Canonical pointers.
 xxx may just want to use enums
@@ -49,19 +50,20 @@ typedef struct {
 */
 
 static RootInfo g_roots[] = {
-    { "BOOT:", g_mtd_device, NULL, "boot", NULL, g_raw },
-    { "RECOVERY:", g_mtd_device, NULL, "recovery", "/", g_raw },
-    { "LOGFILTER:", g_mtd_device, NULL, "LogFilter", NULL, g_raw },
-    { "SYSTEM:", g_mtd_device, NULL, "system", "/system", "yaffs2" },
-    { "USERDATA:", g_mtd_device, NULL, "userdata", "/firstboot", "yaffs2" },
-    { "OEM_LOG:", g_mtd_device, NULL, "oem_log", NULL, g_raw },
-    { "CACHE:", "/dev/block/innersd0p5", NULL, NULL, "/cache", "ext3" },
-    { "DATA:", "/dev/block/innersd0p6", NULL, NULL, "/data", "ext3" },
-    { "SDCARD:", "/dev/block/mmcblk1p1", NULL, NULL, "/sdcard", "vfat" },
-    { "ANDROID_SECURE:", "/sdcard/.android_secure", NULL, NULL, "/sdcard/.android_secure", "folder" },
-    { "PACKAGE:", NULL, NULL, NULL, NULL, g_package_file },
-    { "MBM:", g_mtd_device, NULL, "mbm", NULL, g_raw },
-    { "TMP:", NULL, NULL, NULL, "/tmp", NULL },
+    { "BOOT:", g_mtd_device, NULL, "boot", NULL, g_raw, NULL },
+    { "RECOVERY:", g_mtd_device, NULL, "recovery", "/", g_raw, NULL },
+    { "LOGFILTER:", g_mtd_device, NULL, "LogFilter", NULL, g_raw, NULL },
+    { "SYSTEM:", g_mtd_device, NULL, "system", "/system", "yaffs2", NULL },
+    { "USERDATA:", g_mtd_device, NULL, "userdata", "/firstboot", "yaffs2", NULL },
+    { "OEM_LOG:", g_mtd_device, NULL, "oem_log", NULL, g_raw, NULL },
+    { "CACHE:", "/dev/block/innersd0p5", NULL, NULL, "/cache", "ext3", NULL },
+    { "DATA:", "/dev/block/innersd0p6", NULL, NULL, "/data", "ext3", NULL },
+    { "SDCARD:", "/dev/block/mmcblk1p1", NULL, NULL, "/sdcard", "vfat", NULL },
+    { "ANDROID_SECURE:", "/sdcard/.android_secure", NULL, NULL, "/sdcard/.android_secure", "folder", NULL },
+    { "PACKAGE:", NULL, NULL, NULL, NULL, g_package_file, NULL },
+    { "TMP:", NULL, NULL, NULL, "/tmp", NULL, NULL },
+    { "MBM:", g_mtd_device, NULL, "mbm", NULL, g_raw, NULL },
+
 };
 #define NUM_ROOTS (sizeof(g_roots) / sizeof(g_roots[0]))
 
@@ -219,12 +221,14 @@ int
 ensure_root_path_mounted(const char *root_path)
 {
     const RootInfo *info = get_root_info_for_path(root_path);
-    if (info == NULL) {
+    if (info == NULL)
+    {
         return -1;
     }
 
     int ret = internal_root_mounted(info);
-    if (ret >= 0) {
+    if (ret >= 0) 
+    {
         /* It's already mounted.
          */
         return 0;
@@ -232,47 +236,55 @@ ensure_root_path_mounted(const char *root_path)
 
     /* It's not mounted.
      */
-    if (info->device == g_mtd_device) {
-        if (info->partition_name == NULL) {
+    if (info->device == g_mtd_device) 
+    {
+        if (info->partition_name == NULL) 
+        {
             return -1;
         }
-//TODO: make the mtd stuff scan once when it needs to
+
+        //TODO: make the mtd stuff scan once when it needs to
         mtd_scan_partitions();
         const MtdPartition *partition;
         partition = mtd_find_partition_by_name(info->partition_name);
-        if (partition == NULL) {
+
+        if (partition == NULL) 
+        {
             return -1;
         }
-        return mtd_mount_partition(partition, info->mount_point,
-                info->filesystem, 0);
+
+        return mtd_mount_partition(partition, info->mount_point, info->filesystem, 0);
     }
 
     if (info->device == NULL || info->mount_point == NULL ||
         info->filesystem == NULL ||
         info->filesystem == g_raw ||
-        info->filesystem == g_package_file) {
+        info->filesystem == g_package_file) 
+    {
         return -1;
     }
 
-    //Added
+    mkdir(info->mount_point, 0755);  // in case it doesn't already exist
+
     if(strcmp(info->filesystem, "folder") == 0) {
-    	mkdir(info->mount_point, 0755);  // in case it doesn't already exist
-	return 0;
+       return 0;
     }
 
-    mkdir(info->mount_point, 0755);  // in case it doesn't already exist
-    if (mount(info->device, info->mount_point, info->filesystem,
-            MS_NOATIME | MS_NODEV | MS_NODIRATIME, "")) {
-        if (info->device2 == NULL) {
+    if (mount(info->device, info->mount_point, info->filesystem, MS_NOATIME | MS_NODEV | MS_NODIRATIME, "")) 
+    {
+        if (info->device2 == NULL) 
+        {
             LOGE("Can't mount %s\n(%s)\n", info->device, strerror(errno));
             return -1;
-        } else if (mount(info->device2, info->mount_point, info->filesystem,
-                MS_NOATIME | MS_NODEV | MS_NODIRATIME, "")) {
-            LOGE("Can't mount %s (or %s)\n(%s)\n",
-                    info->device, info->device2, strerror(errno));
+
+        } 
+        else if (mount(info->device2, info->mount_point, info->filesystem, MS_NOATIME | MS_NODEV | MS_NODIRATIME, "")) 
+        {
+            LOGE("Can't mount %s (or %s)\n(%s)\n", info->device, info->device2, strerror(errno));
             return -1;
         }
     }
+
     return 0;
 }
 
@@ -352,33 +364,46 @@ format_root_device(const char *root)
 
     /* Format the device.
      */
-    if (info->device == g_mtd_device) {
+    if (info->device == g_mtd_device) 
+    {
         mtd_scan_partitions();
         const MtdPartition *partition;
         partition = mtd_find_partition_by_name(info->partition_name);
-        if (partition == NULL) {
+        if (partition == NULL) 
+        {
             LOGW("format_root_device: can't find mtd partition \"%s\"\n",
                     info->partition_name);
             return -1;
         }
-        if (info->filesystem == g_raw || !strcmp(info->filesystem, "yaffs2")) {
+
+        if (info->filesystem == g_raw || !strcmp(info->filesystem, "yaffs2")) 
+        {
             MtdWriteContext *write = mtd_write_partition(partition);
-            if (write == NULL) {
+            if (write == NULL) 
+            {
                 LOGW("format_root_device: can't open \"%s\"\n", root);
                 return -1;
-            } else if (mtd_erase_blocks(write, -1) == (off_t) -1) {
+            } 
+            else if (mtd_erase_blocks(write, -1) == (off_t) -1) 
+            {
                 LOGW("format_root_device: can't erase \"%s\"\n", root);
                 mtd_write_close(write);
                 return -1;
-            } else if (mtd_write_close(write)) {
+            } 
+            else if (mtd_write_close(write)) 
+            {
                 LOGW("format_root_device: can't close \"%s\"\n", root);
                 return -1;
-            } else {
+            } 
+            else 
+            {
                 return 0;
             }
         }
-    } else {
-	return format_non_mtd_device(root);
+    } 
+    else 
+    {
+	    return format_non_mtd_device(root);
     }
 
     //TODO: handle other device types (sdcard, etc.)

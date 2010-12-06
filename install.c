@@ -229,7 +229,7 @@ handle_update_script(ZipArchive *zip, const ZipEntry *update_script_entry)
     int ret = execCommandList((ExecContext *)1, commands);
     if (ret != 0) {
         int num = ret;
-        char *line, *next = script_data;
+        char *line = NULL, *next = script_data;
         while (next != NULL && ret-- > 0) {
             line = next;
             next = memchr(line, '\n', script_data + script_len - line);
