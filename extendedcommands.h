@@ -16,11 +16,8 @@ show_nandroid_restore_menu();
 void
 show_nandroid_menu();
 
-void
-show_partition_menu();
-
-void
-show_choose_zip_menu();
+char*
+show_choose_file_menu(char* title, const char *fileExtention);
 
 int
 install_zip(const char* packagefilepath);
@@ -38,7 +35,7 @@ void
 handle_failure();
 
 int
-confirm_selection(const char* title, const char* confirm);
+confirm_selection(char* title, char* confirm);
 
 void
 show_install_update_menu();

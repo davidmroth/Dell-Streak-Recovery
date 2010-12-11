@@ -40,8 +40,7 @@
 #include "Zip.h"
 
 #include "roots.h"
-
-#include "extendedcommands.h"
+#include "nandroid.h"
 
 static int gDidShowProgress = 0;
 
@@ -793,7 +792,7 @@ cmd_backup_rom(const char *name, void *cookie, int argc, const char *argv[],
             }
             break;
         case 1:
-            backup_name = argv[0];
+            strcpy(backup_name, argv[0]);
             break;
         default:
             LOGE("Command %s requires zero or one argument\n", name);
@@ -814,8 +813,10 @@ cmd_restore_rom(const char *name, void *cookie, int argc, const char *argv[],
     int restoresystem = 1;
     int restoredata = 1;
     int restorecache = 1;
-    int restoresdext = 1;
+    int restorefirstboot = 1;
+    int restoreandroidsecure = 1;
     int i;
+
     for (i = 0; i < argc; i++)
     {
         if (strcmp(argv[i], "noboot") == 0)
@@ -826,11 +827,13 @@ cmd_restore_rom(const char *name, void *cookie, int argc, const char *argv[],
             restoredata = 0;
         else if (strcmp(argv[i], "nocache") == 0)
             restorecache = 0;
-        else if (strcmp(argv[i], "nosd-ext") == 0)
+        else if (strcmp(argv[i], "nofirstboot") == 0)
+            restorecache = 0;
+        else if (strcmp(argv[i], "noandroidsecure") == 0)
             restorecache = 0;
     }
 
-    return nandroid_restore(argv[0], restoreboot, restoresystem, restoredata, restorecache, restoresdext);
+    return nandroid_restore(argv[0], restoreboot, restoresystem, restoredata, restorecache, restorefirstboot, restoreandroidsecure);
 }
 
 static int
@@ -859,7 +862,7 @@ cmd_print(const char *name, void *cookie, int argc, const char *argv[],
     CHECK_WORDS();
     
     char message[1024];
-    message[0] = NULL;
+    message[0] = '\0';
     int i;
     for (i = 0; i < argc; i++)
     {
