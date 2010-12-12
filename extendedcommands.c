@@ -179,11 +179,14 @@ show_advanced_menu()
             case 1:
             {
                 if (confirm_selection( "Confirm wipe?", "Yes - Wipe Dalvik Cache")) {
-                    if (0 != ensure_root_path_mounted("DATA:"))
-                        break;
+                    ui_show_indeterminate_progress();
+                    ensure_root_path_mounted("DATA:");
 
+                    ui_print("\n-- Wiping Dalvik Cache...\n");
                     __system("rm -r /data/dalvik-cache 2>&1 /dev/null");
+
                     ensure_root_path_unmounted("DATA:");
+                    ui_reset_progress();
                     ui_print("Dalvik Cache wiped.\n");
                 }
                 break;
@@ -194,13 +197,20 @@ show_advanced_menu()
             case 3:
             {
                 if (confirm_selection( "Confirm repair?", "Yes - Fix permissions")) {
-                    if ( 0 != ensure_root_path_mounted("SYSTEM:") || 0 != ensure_root_path_mounted("DATA:") || 0 != ensure_root_path_mounted("USERDATA:")) {
-                        ui_show_indeterminate_progress();
-                        ui_print("Fixing permissions...\n");
-                        __system("fix_permissions");
-                        ui_reset_progress();
-                        ui_print("Done!\n");
-                    }
+                    ui_show_indeterminate_progress();
+
+                    ensure_root_path_mounted("SYSTEM:");
+                    ensure_root_path_mounted("DATA:");
+                    ensure_root_path_mounted("USERDATA:");
+
+                    ui_print("\n-- Fixing permissions...\n");
+                    __system("fix_permissions");
+
+                    ensure_root_path_unmounted("SYSTEM:");
+                    ensure_root_path_unmounted("DATA:");
+                    ensure_root_path_unmounted("USERDATA:");
+                    ui_reset_progress();
+                    ui_print("Done!\n");
                 }
                 break;
             }
