@@ -48,8 +48,8 @@ include $(BUILD_PREBUILT)
 #----------------------------------------------------------------------
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES := recovery.prop
 LOCAL_MODULE := recovery.prop
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
 LOCAL_MODULE_CLASS := EXECUTABLES
 LOCAL_MODULE_PATH := $(TARGET_RECOVERY_ROOT_OUT)
 include $(BUILD_PREBUILT)
@@ -63,7 +63,7 @@ include $(BUILD_PREBUILT)
 include $(CLEAR_VARS)
 LOCAL_MODULE := fix_permissions
 LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_MODULE_PATH := $(PRODUCT_OUT)
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
 LOCAL_MODULE_PATH := $(TARGET_RECOVERY_ROOT_OUT)
 include $(BUILD_PREBUILT)
 

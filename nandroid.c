@@ -73,7 +73,7 @@ void yaffs_callback(char* filename)
 void compute_directory_stats(char* directory)
 {
     char tmp[PATH_MAX];
-    sprintf(tmp, "find %s | wc -l > /tmp/dircount", directory);
+    sprintf(tmp, "find %s -print -path %slost+found -prune | wc -l > /tmp/dircount", directory, directory);
     __system(tmp);
     char count_text[100];
     FILE* f = fopen("/tmp/dircount", "r");
